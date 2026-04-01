@@ -9,7 +9,11 @@ const path = require("path");
 const fs = require("fs");
 const Database = require("better-sqlite3");
 
-const SECRET = process.env.JWT_SECRET || "devsecret";
+// ☁️ Cloudinary
+const { v2: cloudinary } = require("cloudinary");
+const { CloudinaryStorage } = require("multer-storage-cloudinary");
+
+const SECRET = process.env.JWT_SECRET;
 
 const app = express();
 app.use(cors());
@@ -18,16 +22,18 @@ app.use(express.json());
 const server = http.createServer(app);
 const io = new Server(server, { cors: { origin: "*" } });
 
-// 🔥 Ensure uploads folder exists
-if (!fs.existsSync("uploads")) {
-  fs.mkdirSync("uploads");
-}
+// 🔐 Cloudinary config
+cloudinary.config({
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+  api_key: process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET,
+});
 
 // 📦 SQLite (better-sqlite3)
 const dbPath = path.join(__dirname, "database.db");
 const db = new Database(dbPath);
 
-// 🧱 Create Tables
+// 🧱 Create tables
 db.exec(`
   CREATE TABLE IF NOT EXISTS users (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -45,16 +51,24 @@ db.exec(`
   );
 `);
 
-// 📁 File Upload
-const storage = multer.diskStorage({
-  destination: (_, __, cb) => cb(null, "uploads/"),
-  filename: (_, file, cb) =>
-    cb(null, Date.now() + path.extname(file.originalname)),
+// ☁️ Cloudinary Storage (image + audio)
+const storage = new CloudinaryStorage({
+  cloudinary,
+  params: {
+    folder: "vibechat",
+    resource_type: "auto",
+  },
 });
+
 const upload = multer({ storage });
 
-// Serve uploads
-app.use("/uploads", express.static("uploads"));
+// 🟢 Root route (fixes "Cannot GET /")
+app.get("/", (req, res) => {
+  res.json({
+    status: "running",
+    app: "VibeChat Backend",
+  });
+});
 
 // 🔐 REGISTER
 app.post("/register", async (req, res) => {
@@ -98,13 +112,10 @@ app.post("/login", async (req, res) => {
   });
 });
 
-// 📤 UPLOAD (Image + Audio)
+// 📤 UPLOAD (Cloudinary)
 app.post("/upload", upload.single("file"), (req, res) => {
-  const baseUrl =
-    process.env.BASE_URL || "http://localhost:4000";
-
   res.json({
-    url: `${baseUrl}/uploads/${req.file.filename}`,
+    url: req.file.path, // 🔥 Cloudinary URL
   });
 });
 
