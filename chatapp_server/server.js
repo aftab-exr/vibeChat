@@ -8,7 +8,7 @@ const jwt = require("jsonwebtoken");
 const multer = require("multer");
 const path = require("path");
 
-const SECRET = "supersecretkey";
+const SECRET = process.env.JWT_SECRET;
 
 const app = express();
 app.use(cors());
@@ -155,7 +155,7 @@ io.on("connection", (socket) => {
     io.to(to).emit("ice-candidate", { candidate });
   });
 });
-
-server.listen(4000, () => {
-  console.log("🚀 Server running on http://localhost:4000");
+const PORT = process.env.PORT || 4000;
+server.listen(PORT, () => {
+  console.log(`🚀 Server running on http://localhost:${PORT}`);
 });
