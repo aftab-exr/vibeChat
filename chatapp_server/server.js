@@ -1,22 +1,15 @@
-process.on("uncaughtException", (err) => {
-  console.error("🔥 Uncaught Exception:", err);
-});
-
-process.on("unhandledRejection", (err) => {
-  console.error("🔥 Unhandled Rejection:", err);
-});
-// START 
 const express = require("express");
 const http = require("http");
 const { Server } = require("socket.io");
 const cors = require("cors");
-const sqlite3 = require("sqlite3").verbose();
 const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
 const multer = require("multer");
 const path = require("path");
+const fs = require("fs");
+const Database = require("better-sqlite3");
 
-const SECRET = process.env.JWT_SECRET;
+const SECRET = process.env.JWT_SECRET || "devsecret";
 
 const app = express();
 app.use(cors());
@@ -24,16 +17,35 @@ app.use(express.json());
 
 const server = http.createServer(app);
 const io = new Server(server, { cors: { origin: "*" } });
-const fs = require("fs");
 
+// 🔥 Ensure uploads folder exists
 if (!fs.existsSync("uploads")) {
   fs.mkdirSync("uploads");
 }
-// 📦 DB
-const dbPath = path.join(__dirname, "database.db");
-const db = new sqlite3.Database(dbPath);
 
-// 📁 Upload setup
+// 📦 SQLite (better-sqlite3)
+const dbPath = path.join(__dirname, "database.db");
+const db = new Database(dbPath);
+
+// 🧱 Create Tables
+db.exec(`
+  CREATE TABLE IF NOT EXISTS users (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    username TEXT UNIQUE,
+    password TEXT
+  );
+
+  CREATE TABLE IF NOT EXISTS messages (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    text TEXT,
+    image TEXT,
+    audio TEXT,
+    user_id INTEGER,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  );
+`);
+
+// 📁 File Upload
 const storage = multer.diskStorage({
   destination: (_, __, cb) => cb(null, "uploads/"),
   filename: (_, file, cb) =>
@@ -41,79 +53,66 @@ const storage = multer.diskStorage({
 });
 const upload = multer({ storage });
 
+// Serve uploads
 app.use("/uploads", express.static("uploads"));
 
-// 🧱 Tables
-db.serialize(() => {
-  db.run(`
-    CREATE TABLE IF NOT EXISTS users (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      username TEXT UNIQUE,
-      password TEXT
-    )
-  `);
-
-  db.run(`
-    CREATE TABLE IF NOT EXISTS messages (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      text TEXT,
-      image TEXT,
-      audio TEXT,
-      user_id INTEGER,
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-    )
-  `);
-});
-
-// 🔐 AUTH
+// 🔐 REGISTER
 app.post("/register", async (req, res) => {
-  const { username, password } = req.body;
-  const hashed = await bcrypt.hash(password, 10);
+  try {
+    const { username, password } = req.body;
 
-  db.run(
-    "INSERT INTO users(username, password) VALUES(?, ?)",
-    [username, hashed],
-    function (err) {
-      if (err) return res.status(400).json({ error: "Username exists" });
-      res.json({ id: this.lastID, username });
-    }
-  );
+    const hashed = await bcrypt.hash(password, 10);
+
+    db.prepare("INSERT INTO users(username, password) VALUES(?, ?)")
+      .run(username, hashed);
+
+    res.json({ message: "User registered" });
+  } catch (err) {
+    res.status(400).json({ error: "Username already exists" });
+  }
 });
 
-app.post("/login", (req, res) => {
+// 🔐 LOGIN
+app.post("/login", async (req, res) => {
   const { username, password } = req.body;
 
-  db.get(
-    "SELECT * FROM users WHERE username = ?",
-    [username],
-    async (_, user) => {
-      if (!user) return res.status(404).json({ error: "User not found" });
+  const user = db
+    .prepare("SELECT * FROM users WHERE username = ?")
+    .get(username);
 
-      const valid = await bcrypt.compare(password, user.password);
-      if (!valid) return res.status(401).json({ error: "Wrong password" });
+  if (!user) return res.status(404).json({ error: "User not found" });
 
-      const token = jwt.sign(
-        { id: user.id, username: user.username },
-        SECRET,
-        { expiresIn: "7d" }
-      );
+  const valid = await bcrypt.compare(password, user.password);
+  if (!valid)
+    return res.status(401).json({ error: "Wrong password" });
 
-      res.json({ token, user: { id: user.id, username: user.username } });
-    }
+  const token = jwt.sign(
+    { id: user.id, username: user.username },
+    SECRET,
+    { expiresIn: "7d" }
   );
-});
 
-// 📤 Upload
-app.post("/upload", upload.single("file"), (req, res) => {
   res.json({
-    url: `http://192.168.x.x:4000/uploads/${req.file.filename}`, // replace IP
+    token,
+    user: { id: user.id, username: user.username },
   });
 });
 
-// 🔐 Socket auth
+// 📤 UPLOAD (Image + Audio)
+app.post("/upload", upload.single("file"), (req, res) => {
+  const baseUrl =
+    process.env.BASE_URL || "http://localhost:4000";
+
+  res.json({
+    url: `${baseUrl}/uploads/${req.file.filename}`,
+  });
+});
+
+// 🔐 SOCKET AUTH
 io.use((socket, next) => {
   try {
-    const user = jwt.verify(socket.handshake.auth.token, SECRET);
+    const token = socket.handshake.auth.token;
+    const user = jwt.verify(token, SECRET);
     socket.user = user;
     next();
   } catch {
@@ -121,35 +120,37 @@ io.use((socket, next) => {
   }
 });
 
-// 💬 + 📞 SOCKET
+// 💬 + 📞 SOCKET LOGIC
 io.on("connection", (socket) => {
   console.log("✅ Connected:", socket.user.username, socket.id);
 
-  // Chat history
-  db.all(
-    "SELECT * FROM messages ORDER BY created_at ASC",
-    [],
-    (_, rows) => socket.emit("load_messages", rows)
-  );
+  // Load messages
+  const messages = db
+    .prepare("SELECT * FROM messages ORDER BY created_at ASC")
+    .all();
+
+  socket.emit("load_messages", messages);
 
   // Send message
   socket.on("send_message", (data) => {
     const { text, image, audio } = data;
 
-    db.run(
-      "INSERT INTO messages(text, image, audio, user_id) VALUES(?, ?, ?, ?)",
-      [text || null, image || null, audio || null, socket.user.id],
-      function () {
-        io.emit("receive_message", {
-          id: this.lastID,
-          text,
-          image,
-          audio,
-          user_id: socket.user.id,
-          created_at: new Date(),
-        });
-      }
-    );
+    const result = db
+      .prepare(
+        "INSERT INTO messages(text, image, audio, user_id) VALUES(?, ?, ?, ?)"
+      )
+      .run(text || null, image || null, audio || null, socket.user.id);
+
+    const newMsg = {
+      id: result.lastInsertRowid,
+      text,
+      image,
+      audio,
+      user_id: socket.user.id,
+      created_at: new Date(),
+    };
+
+    io.emit("receive_message", newMsg);
   });
 
   // 📞 CALL SIGNALING
@@ -168,7 +169,19 @@ io.on("connection", (socket) => {
     io.to(to).emit("ice-candidate", { candidate });
   });
 });
+
+// 🔥 ERROR LOGGING
+process.on("uncaughtException", (err) => {
+  console.error("🔥 Uncaught Exception:", err);
+});
+
+process.on("unhandledRejection", (err) => {
+  console.error("🔥 Unhandled Rejection:", err);
+});
+
+// 🚀 START SERVER
 const PORT = process.env.PORT || 4000;
+
 server.listen(PORT, () => {
-  console.log(`🚀 Server running on http://localhost:${PORT}`);
+  console.log("🚀 Server running on port " + PORT);
 });
