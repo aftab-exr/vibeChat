@@ -13,7 +13,7 @@ void main() {
   runApp(const MyApp());
 }
 
-const String baseUrl = "http://192.168.1.3:4000"; // 🔥 CHANGE THIS
+const String baseUrl = "https://vibechat-po7i.onrender.com"; // 🔥 CHANGE THIS
 
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
@@ -75,10 +75,7 @@ class _ChatScreenState extends State<ChatScreen> {
     final res = await http.post(
       Uri.parse("$baseUrl/login"),
       headers: {"Content-Type": "application/json"},
-      body: jsonEncode({
-        "username": "Aaftab",
-        "password": "123456"
-      }),
+      body: jsonEncode({"username": "Aaftab", "password": "123456"}),
     );
 
     final data = jsonDecode(res.body);
@@ -89,10 +86,9 @@ class _ChatScreenState extends State<ChatScreen> {
   void connectSocket() {
     socket = IO.io(
       baseUrl,
-      IO.OptionBuilder()
-          .setTransports(['websocket'])
-          .setAuth({'token': token})
-          .build(),
+      IO.OptionBuilder().setTransports(['websocket']).setAuth({
+        'token': token,
+      }).build(),
     );
 
     socket!.onConnect((_) {
@@ -120,10 +116,7 @@ class _ChatScreenState extends State<ChatScreen> {
       await initCall();
 
       await peerConnection!.setRemoteDescription(
-        RTCSessionDescription(
-          data['offer']['sdp'],
-          data['offer']['type'],
-        ),
+        RTCSessionDescription(data['offer']['sdp'], data['offer']['type']),
       );
 
       var answer = await peerConnection!.createAnswer();
@@ -137,10 +130,7 @@ class _ChatScreenState extends State<ChatScreen> {
 
     socket!.on("call-answered", (data) async {
       await peerConnection!.setRemoteDescription(
-        RTCSessionDescription(
-          data['answer']['sdp'],
-          data['answer']['type'],
-        ),
+        RTCSessionDescription(data['answer']['sdp'], data['answer']['type']),
       );
     });
 
@@ -165,20 +155,26 @@ class _ChatScreenState extends State<ChatScreen> {
 
   // IMAGE
   Future<void> pickImage() async {
-    final picked =
-        await ImagePicker().pickImage(source: ImageSource.gallery);
+    final picked = await ImagePicker().pickImage(source: ImageSource.gallery);
     if (picked == null) return;
 
     uploadFile(File(picked.path), "image");
   }
 
   // AUDIO
-  Future<void> startRecording() async {
-    if (await recorder.hasPermission()) {
-      await recorder.start(const RecordConfig());
-      setState(() => isRecording = true);
-    }
+Future<void> startRecording() async {
+  if (await recorder.hasPermission()) {
+    final path =
+        '${DateTime.now().millisecondsSinceEpoch}.m4a';
+
+    await recorder.start(
+      const RecordConfig(),
+      path: path,
+    );
+
+    setState(() => isRecording = true);
   }
+}
 
   Future<void> stopRecording() async {
     final path = await recorder.stop();
@@ -189,10 +185,7 @@ class _ChatScreenState extends State<ChatScreen> {
 
   // UPLOAD
   Future<void> uploadFile(File file, String type) async {
-    var request = http.MultipartRequest(
-      'POST',
-      Uri.parse("$baseUrl/upload"),
-    );
+    var request = http.MultipartRequest('POST', Uri.parse("$baseUrl/upload"));
 
     request.files.add(await http.MultipartFile.fromPath('file', file.path));
 
@@ -212,8 +205,8 @@ class _ChatScreenState extends State<ChatScreen> {
   Future<void> initCall() async {
     peerConnection = await createPeerConnection({
       "iceServers": [
-        {"urls": "stun:stun.l.google.com:19302"}
-      ]
+        {"urls": "stun:stun.l.google.com:19302"},
+      ],
     });
 
     localStream = await navigator.mediaDevices.getUserMedia({
@@ -247,10 +240,7 @@ class _ChatScreenState extends State<ChatScreen> {
     var offer = await peerConnection!.createOffer();
     await peerConnection!.setLocalDescription(offer);
 
-    socket!.emit("call-user", {
-      "to": targetSocketId,
-      "offer": offer.toMap(),
-    });
+    socket!.emit("call-user", {"to": targetSocketId, "offer": offer.toMap()});
   }
 
   void endCall() {
@@ -289,10 +279,7 @@ class _ChatScreenState extends State<ChatScreen> {
       appBar: AppBar(
         title: const Text("Vibe Chat"),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.call),
-            onPressed: callUser,
-          )
+          IconButton(icon: const Icon(Icons.call), onPressed: callUser),
         ],
       ),
       body: Column(
@@ -315,13 +302,16 @@ class _ChatScreenState extends State<ChatScreen> {
                     child: const Icon(Icons.play_arrow, color: Colors.white),
                   );
                 } else {
-                  content = Text(msg['text'] ?? "",
-                      style: const TextStyle(color: Colors.white));
+                  content = Text(
+                    msg['text'] ?? "",
+                    style: const TextStyle(color: Colors.white),
+                  );
                 }
 
                 return Align(
-                  alignment:
-                      isMe ? Alignment.centerRight : Alignment.centerLeft,
+                  alignment: isMe
+                      ? Alignment.centerRight
+                      : Alignment.centerLeft,
                   child: Container(
                     margin: const EdgeInsets.all(8),
                     padding: const EdgeInsets.all(10),
@@ -337,30 +327,20 @@ class _ChatScreenState extends State<ChatScreen> {
           ),
 
           // VIDEO VIEW
-          SizedBox(
-            height: 200,
-            child: RTCVideoView(remoteRenderer),
-          ),
+          SizedBox(height: 200, child: RTCVideoView(remoteRenderer)),
 
           // INPUT BAR
           Row(
             children: [
-              IconButton(
-                icon: const Icon(Icons.image),
-                onPressed: pickImage,
-              ),
+              IconButton(icon: const Icon(Icons.image), onPressed: pickImage),
               IconButton(
                 icon: Icon(isRecording ? Icons.stop : Icons.mic),
-                onPressed:
-                    isRecording ? stopRecording : startRecording,
+                onPressed: isRecording ? stopRecording : startRecording,
               ),
               Expanded(child: TextField(controller: controller)),
-              IconButton(
-                icon: const Icon(Icons.send),
-                onPressed: sendMessage,
-              ),
+              IconButton(icon: const Icon(Icons.send), onPressed: sendMessage),
             ],
-          )
+          ),
         ],
       ),
     );
