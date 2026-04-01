@@ -30,7 +30,6 @@ if (!fs.existsSync("uploads")) {
   fs.mkdirSync("uploads");
 }
 // 📦 DB
-const path = require("path");
 const dbPath = path.join(__dirname, "database.db");
 const db = new sqlite3.Database(dbPath);
 
