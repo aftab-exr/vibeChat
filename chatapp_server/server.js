@@ -1,3 +1,11 @@
+process.on("uncaughtException", (err) => {
+  console.error("🔥 Uncaught Exception:", err);
+});
+
+process.on("unhandledRejection", (err) => {
+  console.error("🔥 Unhandled Rejection:", err);
+});
+// START 
 const express = require("express");
 const http = require("http");
 const { Server } = require("socket.io");
@@ -16,9 +24,15 @@ app.use(express.json());
 
 const server = http.createServer(app);
 const io = new Server(server, { cors: { origin: "*" } });
+const fs = require("fs");
 
+if (!fs.existsSync("uploads")) {
+  fs.mkdirSync("uploads");
+}
 // 📦 DB
-const db = new sqlite3.Database("./database.db");
+const path = require("path");
+const dbPath = path.join(__dirname, "database.db");
+const db = new sqlite3.Database(dbPath);
 
 // 📁 Upload setup
 const storage = multer.diskStorage({
