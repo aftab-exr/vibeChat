@@ -1,0 +1,13 @@
+# Node
+node_modules/
+uploads/
+database.db
+.env
+
+# Flutter
+build/
+.dart_tool/
+
+# OS
+.DS_Store
+Thumbs.db
