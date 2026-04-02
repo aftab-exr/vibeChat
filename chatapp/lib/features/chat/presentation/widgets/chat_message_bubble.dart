@@ -1,9 +1,11 @@
+import 'dart:typed_data'; // 🔐 NEW: Required for Uint8List
 import 'package:flutter/material.dart';
 
 import 'package:chatapp/core/design/app_colors.dart';
 import 'package:chatapp/core/design/app_radius.dart';
 import 'package:chatapp/core/design/app_shadows.dart';
 import 'package:chatapp/core/design/app_spacing.dart';
+import 'package:chatapp/features/chat/data/encryption_service.dart'; // 🔐 NEW: Import your encryption service
 
 class ChatMessageBubble extends StatelessWidget {
   const ChatMessageBubble({
@@ -13,6 +15,7 @@ class ChatMessageBubble extends StatelessWidget {
     this.text,
     this.imageUrl,
     this.audioUrl,
+    this.encryptionKey, // 🔐 NEW: Accept encryption key
     this.isAudioPlaying = false,
     this.onAudioPressed,
     this.onImagePressed,
@@ -23,6 +26,7 @@ class ChatMessageBubble extends StatelessWidget {
   final String? text;
   final String? imageUrl;
   final String? audioUrl;
+  final String? encryptionKey; // 🔐 NEW: Encryption key field
   final bool isAudioPlaying;
   final VoidCallback? onAudioPressed;
   final VoidCallback? onImagePressed;
@@ -62,7 +66,11 @@ class ChatMessageBubble extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
               if (_hasImage)
-                _ImageMessage(imageUrl: imageUrl!, onPressed: onImagePressed)
+                _ImageMessage(
+                  imageUrl: imageUrl!, 
+                  encryptionKey: encryptionKey, // 🔐 NEW: Pass key to image widget
+                  onPressed: onImagePressed
+                )
               else if (_hasAudio)
                 _AudioMessage(
                   isMe: isMe,
@@ -110,9 +118,14 @@ class ChatMessageBubble extends StatelessWidget {
 }
 
 class _ImageMessage extends StatelessWidget {
-  const _ImageMessage({required this.imageUrl, this.onPressed});
+  const _ImageMessage({
+    required this.imageUrl, 
+    this.encryptionKey, // 🔐 NEW
+    this.onPressed
+  });
 
   final String imageUrl;
+  final String? encryptionKey; // 🔐 NEW
   final VoidCallback? onPressed;
 
   @override
@@ -128,22 +141,29 @@ class _ImageMessage extends StatelessWidget {
           children: [
             AspectRatio(
               aspectRatio: 1,
-              child: Image.network(
-                imageUrl,
-                fit: BoxFit.cover,
-                loadingBuilder: (context, child, progress) {
-                  if (progress == null) {
-                    return child;
+              // 🔐 NEW: Replaced Image.network with FutureBuilder + Image.memory
+              child: FutureBuilder<Uint8List?>(
+                future: EncryptionService.downloadAndDecrypt(imageUrl, encryptionKey),
+                builder: (context, snapshot) {
+                  // Loading state
+                  if (snapshot.connectionState == ConnectionState.waiting) {
+                    return ColoredBox(
+                      color: surfaceTint,
+                      child: const Center(
+                        child: CircularProgressIndicator(strokeWidth: 2.2),
+                      ),
+                    );
                   }
-
-                  return ColoredBox(
-                    color: surfaceTint,
-                    child: Center(
-                      child: CircularProgressIndicator(strokeWidth: 2.2),
-                    ),
-                  );
-                },
-                errorBuilder: (context, error, stackTrace) {
+                  
+                  // Success state (Image decrypted successfully)
+                  if (snapshot.hasData && snapshot.data != null) {
+                    return Image.memory(
+                      snapshot.data!,
+                      fit: BoxFit.cover,
+                    );
+                  }
+                  
+                  // Error state (Failed to decrypt or download)
                   return ColoredBox(
                     color: surfaceTint,
                     child: Center(
@@ -181,6 +201,7 @@ class _ImageMessage extends StatelessWidget {
   }
 }
 
+// ... _AudioMessage remains unchanged below this ...
 class _AudioMessage extends StatelessWidget {
   const _AudioMessage({
     required this.isMe,
