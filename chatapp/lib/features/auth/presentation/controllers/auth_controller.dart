@@ -109,10 +109,11 @@ class AuthController extends ValueNotifier<AuthState> {
         errorMessage: error.message,
       );
       return false;
-    } catch (_) {
-      value = const AuthState(
+    } catch (e) {
+      value = AuthState(
         status: AuthStatus.unauthenticated,
-        errorMessage: 'Something went wrong. Please try again.',
+        errorMessage:
+            'Error: ${e.toString()}', // <-- This will show on your phone screen!
       );
       return false;
     }

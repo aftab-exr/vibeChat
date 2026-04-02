@@ -44,6 +44,7 @@ dependencies:
   shared_preferences: ^2.5.5
   google_fonts: ^8.0.2
   encrypt: ^5.0.3
+  flutter_dotenv: ^6.0.0
 
 dev_dependencies:
   flutter_test:
@@ -97,3 +98,7 @@ flutter:
   #
   # For details regarding fonts from package dependencies,
   # see https://flutter.dev/to/font-from-package
+assets:
+  - assets/images/
+  - assets/audio/
+  - .env
