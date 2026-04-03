@@ -6,13 +6,18 @@ import 'package:chatapp/features/inbox/domain/models/inbox_filter.dart';
 import 'package:chatapp/features/inbox/presentation/models/inbox_view_state.dart';
 
 class InboxController extends ValueNotifier<InboxViewState> {
-  InboxController({required InboxRepository repository})
-    : _allConversations = List.unmodifiable(repository.getConversations()),
-      super(const InboxViewState()) {
-    _recompute();
+  InboxController({required this.repository}) : super(const InboxViewState()) {
+    _init();
   }
 
-  final List<ConversationPreview> _allConversations;
+  final InboxRepository repository;
+  List<ConversationPreview> _allConversations = const [];
+
+  Future<void> _init() async {
+    final conversations = await repository.getConversations();
+    _allConversations = List.unmodifiable(conversations);
+    _recompute();
+  }
 
   void updateQuery(String query) {
     final normalizedQuery = query.trim();
