@@ -57,7 +57,8 @@ class EncryptionService {
 
       return Uint8List.fromList(decryptedBytes);
     } catch (e) {
-      print("Decryption error: $e");
+      // ERROR HANDLING: In a real app, you might want to log this error or show a user-friendly message
+      // print("Decryption error: $e");
       return null;
     }
   }

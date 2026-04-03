@@ -20,7 +20,7 @@ class ChatMessageList extends StatelessWidget {
 
   final ScrollController scrollController;
   final List<ChatMessageItem> messages;
-  final int? currentUserId;
+  final String? currentUserId;
   final String? activeAudioUrl;
   final ValueChanged<String> onAudioPressed;
   final ValueChanged<String> onImagePressed;

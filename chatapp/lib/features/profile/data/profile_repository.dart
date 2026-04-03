@@ -21,7 +21,10 @@ class ProfileRepository {
     final username = (rawUsername != null && rawUsername.isNotEmpty)
         ? rawUsername
         : 'guest_user';
-    final userId = authUser?.id ?? 0;
+        
+    // 🔐 FIXED: Fallback to a String '0' instead of int 0
+    final userId = authUser?.id ?? '0'; 
+    
     final displayName = _displayName(username);
     final slug = _slug(username);
 
@@ -33,8 +36,9 @@ class ProfileRepository {
       avatarLabel: _avatarLabel(displayName),
       status: 'Available on VibeChat',
       about: 'Building cleaner conversations with a lightweight MVP mindset.',
-      seedColor: _palette[userId % _palette.length],
-      userId: userId,
+      // 🔐 FIXED: Use hashCode.abs() to safely do math on the String ID
+      seedColor: _palette[userId.hashCode.abs() % _palette.length],
+      userId: int.tryParse(userId) ?? 0, // 🔐 FIXED: Try to parse the String ID to int, fallback to 0 if it fails
     );
   }
 
@@ -79,8 +83,10 @@ class ProfileRepository {
     return '${parts.first[0]}${parts.last[0]}'.toUpperCase();
   }
 
-  String _phoneForId(int userId) {
-    final base = (userId * 1731 + 54892).abs().toString().padLeft(10, '0');
+  // 🔐 FIXED: Accept a String and convert it to a numeric hash for the math
+  String _phoneForId(String userId) {
+    final numericId = userId.hashCode.abs();
+    final base = (numericId * 1731 + 54892).abs().toString().padLeft(10, '0');
     final digits = base.substring(base.length - 10);
     return '+91 ${digits.substring(0, 5)} ${digits.substring(5)}';
   }

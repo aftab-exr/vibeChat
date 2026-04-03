@@ -1,17 +1,26 @@
 class AuthUser {
-  const AuthUser({required this.id, required this.username});
+  const AuthUser({
+    required this.id,
+    required this.username,
+  });
 
-  final int id;
-  final String username;
-
-  Map<String, dynamic> toJson() {
-    return {'id': id, 'username': username};
-  }
-
-  factory AuthUser.fromJson(Map<String, dynamic> json) {
+  // 🔐 NEW: Added fromJson to match what auth_session.dart is looking for
+  factory AuthUser.fromJson(Map<String, dynamic> map) {
     return AuthUser(
-      id: json['id'] as int? ?? 0,
-      username: json['username'] as String? ?? '',
+      // Safely handle the MongoDB String
+      id: map['id']?.toString() ?? map['_id']?.toString() ?? '', 
+      username: map['username'] as String? ?? 'Unknown',
     );
   }
+
+  // 🔐 NEW: Added toJson to match what auth_session.dart is looking for
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'username': username,
+    };
+  }
+
+  final String id;
+  final String username;
 }

@@ -19,6 +19,6 @@ void main() {
     expect(item.createdAt, DateTime.parse('2026-04-02T10:15:00.000Z'));
     expect(item.hasImage, isTrue);
     expect(item.hasAudio, isTrue);
-    expect(item.isFromUser(7), isTrue);
+    expect(item.isFromUser('7'), isTrue);
   });
 }

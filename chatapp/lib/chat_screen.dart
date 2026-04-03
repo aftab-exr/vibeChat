@@ -48,7 +48,7 @@ class _ChatScreenState extends State<ChatScreen> {
 
   io.Socket? socket;
   String? token;
-  int? userId;
+  String? userId;
   RTCPeerConnection? peerConnection;
   MediaStream? localStream;
   String? targetSocketId;
